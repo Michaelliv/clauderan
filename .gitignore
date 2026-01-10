@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+ran
+dist/
+*.tsbuildinfo
+
+# Bun
+bun.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage/
+
+# Local data
+*.db
