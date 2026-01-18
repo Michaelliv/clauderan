@@ -6,18 +6,34 @@ export interface OnboardOptions {
   force?: boolean;
 }
 
-const MARKER = "<!-- ran:onboard -->";
+const MARKER = "<!-- deja:onboard -->";
 
-const RAN_SECTION = `${MARKER}
-## ran - Claude Code bash history
+const DEJA_SECTION = `${MARKER}
+<deja>
+Use \`deja\` to search bash commands from previous Claude Code sessions.
 
-Use the \`ran\` CLI to search commands from previous Claude Code sessions:
+<commands>
+- \`deja search <pattern>\` - Search by substring (or \`--regex\`)
+- \`deja list\` - Recent commands
+- \`deja list --here\` - Recent commands in current project
+- \`deja search <pattern> --here\` - Search in current project
+</commands>
 
-- \`ran search <pattern>\` - Search by substring or regex (\`--regex\`)
-- \`ran list\` - Show recent commands
-- \`ran search "" --cwd /path\` - Filter by directory
+<when-to-use>
+- "Deploy like we did last time"
+- "Run the same build command"
+- "What was that curl/docker/git command?"
+- "Set it up like we did on the other project"
+- "Show me the failed builds"
+- Looking up commands from previous sessions
+</when-to-use>
 
-Example: "What docker command did you run?" → \`ran search docker\`
+<when-not-to-use>
+- Finding files -> use Glob
+- Searching file contents -> use Grep
+- Commands from current session -> already in context
+</when-not-to-use>
+</deja>
 `;
 
 export function onboard(options: OnboardOptions = {}): void {
@@ -34,9 +50,14 @@ export function onboard(options: OnboardOptions = {}): void {
     existingContent = readFileSync(targetFile, "utf-8");
   }
 
-  if (existingContent.includes(MARKER)) {
+  // Check for both old and new markers
+  const oldMarker = "<!-- ran:onboard -->";
+  const hasOldMarker = existingContent.includes(oldMarker);
+  const hasNewMarker = existingContent.includes(MARKER);
+
+  if (hasNewMarker) {
     if (!options.force) {
-      console.log(`ran section already exists in ${targetFile}`);
+      console.log(`deja section already exists in ${targetFile}`);
       console.log("Use --force to update it");
       return;
     }
@@ -49,14 +70,25 @@ export function onboard(options: OnboardOptions = {}): void {
     } else {
       existingContent = existingContent.slice(0, markerIndex);
     }
+  } else if (hasOldMarker) {
+    // Remove old ran section and replace with new deja section
+    const markerIndex = existingContent.indexOf(oldMarker);
+    const nextSectionMatch = existingContent.slice(markerIndex + oldMarker.length).match(/\n## /);
+    if (nextSectionMatch && nextSectionMatch.index !== undefined) {
+      const endIndex = markerIndex + oldMarker.length + nextSectionMatch.index;
+      existingContent = existingContent.slice(0, markerIndex) + existingContent.slice(endIndex);
+    } else {
+      existingContent = existingContent.slice(0, markerIndex);
+    }
+    console.log("Migrating from ran to deja...");
   }
 
   const newContent = existingContent
-    ? existingContent.trimEnd() + "\n\n" + RAN_SECTION
-    : RAN_SECTION;
+    ? existingContent.trimEnd() + "\n\n" + DEJA_SECTION
+    : DEJA_SECTION;
 
   writeFileSync(targetFile, newContent);
 
   const action = existingContent ? "Updated" : "Created";
-  console.log(`${action} ${targetFile} with ran section`);
+  console.log(`${action} ${targetFile} with deja section`);
 }

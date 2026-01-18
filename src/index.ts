@@ -11,39 +11,49 @@ const command = args[0];
 
 function printHelp(): void {
   console.log(`
-\x1b[1mran\x1b[0m - Claude Code bash history
+\x1b[1mdeja\x1b[0m - Claude Code bash history
 
 \x1b[1mUSAGE:\x1b[0m
-  ran <command> [options]
+  deja <command> [options]
 
 \x1b[1mCOMMANDS:\x1b[0m
   search <pattern>   Search command history
     --regex, -r      Use regex pattern
     --cwd <path>     Filter by working directory
+    --here, -H       Filter by current directory
     --limit, -n <N>  Limit results
+    --sort <mode>    Sort by: frecency (default), time
     --no-sync        Skip auto-sync
 
   list               List recent commands
     --limit, -n <N>  Number of commands (default: 20)
+    --here, -H       Filter by current directory
+    --sort <mode>    Sort by: frecency (default), time
     --no-sync        Skip auto-sync
 
   sync               Sync command history from Claude sessions
     --force, -f      Force re-index all sessions
 
-  onboard            Add ran section to ~/.claude/CLAUDE.md
+  onboard            Add deja section to ~/.claude/CLAUDE.md
     --force, -f      Update existing section
 
 \x1b[1mEXAMPLES:\x1b[0m
-  ran search docker
-  ran search "git.*main" --regex
-  ran search npm --cwd /projects/myapp
-  ran list --limit 50
-  ran sync --force
+  deja search docker
+  deja search "git.*main" --regex
+  deja search npm --cwd /projects/myapp
+  deja search npm --here
+  deja search npm --sort time
+  deja list --limit 50
+  deja list --here
+  deja sync --force
 `);
 }
 
 async function main(): Promise<void> {
   const { flags, positional } = parseArgs(args.slice(1));
+
+  // Handle --here flag by setting cwd to current directory
+  const cwd = flags.here ? process.cwd() : (flags.cwd as string);
 
   switch (command) {
     case "search":
@@ -54,9 +64,10 @@ async function main(): Promise<void> {
       }
       await search(positional[0], {
         regex: flags.regex as boolean,
-        cwd: flags.cwd as string,
+        cwd,
         limit: flags.limit ? parseInt(flags.limit as string, 10) : undefined,
         noSync: flags.noSync as boolean,
+        sort: (flags.sort as string) || "frecency",
       });
       break;
 
@@ -66,6 +77,8 @@ async function main(): Promise<void> {
       await list({
         limit: flags.limit ? parseInt(flags.limit as string, 10) : undefined,
         noSync: flags.noSync as boolean,
+        sort: (flags.sort as string) || "frecency",
+        cwd,
       });
       break;
 

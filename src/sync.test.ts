@@ -274,7 +274,7 @@ also not valid
     };
 
     beforeEach(async () => {
-      tempDir = join(tmpdir(), `ran-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      tempDir = join(tmpdir(), `deja-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       mkdirSync(tempDir, { recursive: true });
       db = await createDb(":memory:");
     });

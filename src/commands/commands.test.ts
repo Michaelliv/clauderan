@@ -68,29 +68,39 @@ describe("command modules", () => {
   });
 
   describe("search", () => {
-    it("finds commands by substring", async () => {
-      await search("docker", { noSync: true });
+    it("finds commands by substring (time sort)", async () => {
+      // Use time sort to avoid highlighting ANSI codes in output
+      await search("docker", { noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Found 2 command(s)"))).toBe(true);
       expect(consoleLogs.some(l => l.includes("docker build"))).toBe(true);
       expect(consoleLogs.some(l => l.includes("docker push"))).toBe(true);
     });
 
+    it("finds commands with frecency sort (default)", async () => {
+      await search("docker", { noSync: true });
+
+      expect(consoleLogs.some(l => l.includes("Found 2 command(s)"))).toBe(true);
+      expect(consoleLogs.some(l => l.includes("[sorted by frecency]"))).toBe(true);
+      // With highlighting, check for docker separately
+      expect(consoleLogs.some(l => l.includes("docker"))).toBe(true);
+    });
+
     it("filters by regex", async () => {
-      await search("docker (build|push)", { regex: true, noSync: true });
+      await search("docker (build|push)", { regex: true, noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Found 2 command(s)"))).toBe(true);
     });
 
     it("filters by cwd", async () => {
-      await search("docker", { cwd: "/projects/app", noSync: true });
+      await search("docker", { cwd: "/projects/app", noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Found 1 command(s)"))).toBe(true);
       expect(consoleLogs.some(l => l.includes("docker build"))).toBe(true);
     });
 
     it("respects limit", async () => {
-      await search("docker", { limit: 1, noSync: true });
+      await search("docker", { limit: 1, noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("(showing 1)"))).toBe(true);
     });
@@ -103,8 +113,8 @@ describe("command modules", () => {
   });
 
   describe("list", () => {
-    it("lists recent commands", async () => {
-      await list({ noSync: true });
+    it("lists recent commands (time sort)", async () => {
+      await list({ noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Last 3 command(s)"))).toBe(true);
       expect(consoleLogs.some(l => l.includes("docker push"))).toBe(true);
@@ -112,8 +122,14 @@ describe("command modules", () => {
       expect(consoleLogs.some(l => l.includes("docker build"))).toBe(true);
     });
 
+    it("lists commands with frecency sort (default)", async () => {
+      await list({ noSync: true });
+
+      expect(consoleLogs.some(l => l.includes("[sorted by frecency]"))).toBe(true);
+    });
+
     it("respects limit", async () => {
-      await list({ limit: 2, noSync: true });
+      await list({ limit: 2, noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Last 2 command(s)"))).toBe(true);
     });

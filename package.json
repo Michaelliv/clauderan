@@ -1,12 +1,12 @@
 {
-  "name": "clauderan",
-  "version": "0.1.1",
+  "name": "cc-dejavu",
+  "version": "0.2.0",
   "description": "CLI tool to search and browse Claude Code bash command history",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Michaelliv/clauderan.git"
+    "url": "git+https://github.com/Michaelliv/cc-dejavu.git"
   },
   "keywords": [
     "claude",
@@ -14,22 +14,23 @@
     "bash",
     "history",
     "cli",
-    "search"
+    "search",
+    "dejavu"
   ],
   "author": "Michaelliv",
   "bin": {
-    "ran": "./dist/index.js"
+    "deja": "./dist/index.js"
   },
   "files": [
     "dist"
   ],
   "scripts": {
     "dev": "bun run src/index.ts",
-    "build": "bun build --compile --outfile=ran ./src/index.ts",
+    "build": "bun build --compile --outfile=deja ./src/index.ts",
     "build:npm": "bun build ./src/index.ts --outdir ./dist --target node",
     "test": "bun test",
     "prepublishOnly": "bun run build:npm",
-    "postinstall": "echo '\n  Run \"ran onboard\" to add ran to ~/.claude/CLAUDE.md\n'"
+    "postinstall": "echo '\n  Run \"deja onboard\" to add deja to ~/.claude/CLAUDE.md\n'"
   },
   "dependencies": {
     "sql.js": "^1.13.0"

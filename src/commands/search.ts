@@ -1,4 +1,4 @@
-import { searchCommands, type Command } from "../db";
+import { searchCommands, searchCommandsWithFrecency, type Command, type CommandWithFrecency } from "../db";
 import { sync } from "../sync";
 import { formatCommand } from "../format";
 
@@ -7,6 +7,7 @@ export interface SearchOptions {
   cwd?: string;
   limit?: number;
   noSync?: boolean;
+  sort?: string; // "frecency" (default) or "time"
 }
 
 export async function search(pattern: string, options: SearchOptions = {}): Promise<void> {
@@ -15,7 +16,15 @@ export async function search(pattern: string, options: SearchOptions = {}): Prom
     await sync();
   }
 
-  const results = await searchCommands(pattern, options.regex ?? false, options.cwd);
+  const useFrecency = options.sort !== "time";
+
+  let results: (Command | CommandWithFrecency)[];
+  if (useFrecency) {
+    results = await searchCommandsWithFrecency(pattern, options.regex ?? false, options.cwd);
+  } else {
+    results = await searchCommands(pattern, options.regex ?? false, options.cwd);
+  }
+
   const limited = options.limit ? results.slice(0, options.limit) : results;
 
   if (limited.length === 0) {
@@ -23,9 +32,14 @@ export async function search(pattern: string, options: SearchOptions = {}): Prom
     return;
   }
 
-  console.log(`Found ${results.length} command(s)${options.limit && results.length > options.limit ? ` (showing ${options.limit})` : ""}:\n`);
+  const sortLabel = useFrecency ? "frecency" : "time";
+  console.log(`Found ${results.length} command(s)${options.limit && results.length > options.limit ? ` (showing ${options.limit})` : ""} [sorted by ${sortLabel}]:\n`);
 
   for (const cmd of limited) {
-    formatCommand(cmd);
+    formatCommand(cmd, {
+      pattern: useFrecency ? pattern : undefined,
+      useRegex: options.regex,
+      showFrequency: useFrecency,
+    });
   }
 }
