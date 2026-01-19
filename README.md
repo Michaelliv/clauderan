@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hero.gif" alt="deja" width="600">
+</p>
+
 # deja
 
 [![CI](https://github.com/Michaelliv/cc-dejavu/actions/workflows/ci.yml/badge.svg)](https://github.com/Michaelliv/cc-dejavu/actions/workflows/ci.yml)
