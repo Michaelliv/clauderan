@@ -47,18 +47,27 @@ Every bash command Claude Code runs is logged in session files. `deja` indexes t
 
 ## Install
 
-Requires [Bun](https://bun.sh).
-
 ```bash
-# Install globally
-bun add -g cc-dejavu
+curl -fsSL https://raw.githubusercontent.com/Michaelliv/cc-dejavu/main/install.sh | bash
+```
 
-# Or build from source
+Or with Bun:
+```bash
+bun add -g cc-dejavu
+```
+
+<details>
+<summary>Other options</summary>
+
+**Manual download**: Get binaries from [releases](https://github.com/Michaelliv/cc-dejavu/releases)
+
+**From source**:
+```bash
 git clone https://github.com/Michaelliv/cc-dejavu
 cd cc-dejavu
-bun install
-bun run build  # Creates ./deja binary
+bun install && bun run build
 ```
+</details>
 
 ## Usage
 
