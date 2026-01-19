@@ -2,7 +2,7 @@
 set -e
 
 REPO="Michaelliv/cc-dejavu"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="$HOME/.local/bin"
 
 # Detect OS
 OS="$(uname -s)"
@@ -24,25 +24,30 @@ esac
 # Build binary name
 if [ "$OS" = "windows" ]; then
   BINARY="deja-windows-x64.exe"
-  INSTALL_DIR="$HOME/bin"
 else
   BINARY="deja-${OS}-${ARCH}"
 fi
 
 echo "Downloading deja for ${OS}/${ARCH}..."
 
+# Create install dir
+mkdir -p "$INSTALL_DIR"
+
 # Download
 URL="https://github.com/${REPO}/releases/latest/download/${BINARY}"
-curl -fsSL "$URL" -o deja
-
-# Install
-chmod +x deja
-if [ -w "$INSTALL_DIR" ]; then
-  mv deja "$INSTALL_DIR/deja"
-else
-  echo "Installing to $INSTALL_DIR (requires sudo)..."
-  sudo mv deja "$INSTALL_DIR/deja"
-fi
+curl -fsSL "$URL" -o "$INSTALL_DIR/deja"
+chmod +x "$INSTALL_DIR/deja"
 
 echo "Installed deja to $INSTALL_DIR/deja"
+
+# Check if in PATH
+if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
+  echo ""
+  echo "Add to your PATH by running:"
+  echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+  echo "  # or for zsh:"
+  echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+fi
+
+echo ""
 echo "Run 'deja onboard' to set up Claude integration"
