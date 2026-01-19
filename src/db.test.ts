@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
+import { Database } from "bun:sqlite";
 import {
   createDb,
   insertCommand,
@@ -9,18 +10,17 @@ import {
   getIndexedFile,
   type Command,
 } from "./db";
-import type { Database } from "sql.js";
 
 describe("db", () => {
   let db: Database;
 
-  beforeEach(async () => {
-    db = await createDb(":memory:");
+  beforeEach(() => {
+    db = createDb(":memory:");
   });
 
   describe("insertCommand", () => {
-    it("inserts a command", async () => {
-      await insertCommand(
+    it("inserts a command", () => {
+      insertCommand(
         {
           tool_use_id: "tool_1",
           command: "ls -la",
@@ -35,13 +35,13 @@ describe("db", () => {
         db
       );
 
-      const results = await listCommands(10, db);
+      const results = listCommands(10, db);
       expect(results).toHaveLength(1);
       expect(results[0].command).toBe("ls -la");
       expect(results[0].description).toBe("List files");
     });
 
-    it("ignores duplicate tool_use_id", async () => {
+    it("ignores duplicate tool_use_id", () => {
       const cmd = {
         tool_use_id: "tool_1",
         command: "ls -la",
@@ -54,18 +54,18 @@ describe("db", () => {
         session_id: "session_1",
       };
 
-      await insertCommand(cmd, db);
-      await insertCommand({ ...cmd, command: "different command" }, db);
+      insertCommand(cmd, db);
+      insertCommand({ ...cmd, command: "different command" }, db);
 
-      const results = await listCommands(10, db);
+      const results = listCommands(10, db);
       expect(results).toHaveLength(1);
       expect(results[0].command).toBe("ls -la");
     });
   });
 
   describe("searchCommands", () => {
-    beforeEach(async () => {
-      await insertCommand(
+    beforeEach(() => {
+      insertCommand(
         {
           tool_use_id: "tool_1",
           command: "docker build -t myapp .",
@@ -79,7 +79,7 @@ describe("db", () => {
         },
         db
       );
-      await insertCommand(
+      insertCommand(
         {
           tool_use_id: "tool_2",
           command: "npm test",
@@ -93,7 +93,7 @@ describe("db", () => {
         },
         db
       );
-      await insertCommand(
+      insertCommand(
         {
           tool_use_id: "tool_3",
           command: "docker push myapp",
@@ -109,42 +109,42 @@ describe("db", () => {
       );
     });
 
-    it("searches by substring", async () => {
-      const results = await searchCommands("docker", false, undefined, db);
+    it("searches by substring", () => {
+      const results = searchCommands("docker", false, undefined, db);
       expect(results).toHaveLength(2);
     });
 
-    it("searches case-insensitively", async () => {
-      const results = await searchCommands("DOCKER", false, undefined, db);
+    it("searches case-insensitively", () => {
+      const results = searchCommands("DOCKER", false, undefined, db);
       expect(results).toHaveLength(2);
     });
 
-    it("filters by cwd", async () => {
-      const results = await searchCommands("docker", false, "/projects/myapp", db);
+    it("filters by cwd", () => {
+      const results = searchCommands("docker", false, "/projects/myapp", db);
       expect(results).toHaveLength(1);
       expect(results[0].command).toBe("docker build -t myapp .");
     });
 
-    it("searches with regex", async () => {
-      const results = await searchCommands("docker (build|push)", true, undefined, db);
+    it("searches with regex", () => {
+      const results = searchCommands("docker (build|push)", true, undefined, db);
       expect(results).toHaveLength(2);
     });
 
-    it("regex with cwd filter", async () => {
-      const results = await searchCommands("docker.*", true, "/projects/other", db);
+    it("regex with cwd filter", () => {
+      const results = searchCommands("docker.*", true, "/projects/other", db);
       expect(results).toHaveLength(1);
       expect(results[0].command).toBe("docker push myapp");
     });
 
-    it("returns empty for no matches", async () => {
-      const results = await searchCommands("nonexistent", false, undefined, db);
+    it("returns empty for no matches", () => {
+      const results = searchCommands("nonexistent", false, undefined, db);
       expect(results).toHaveLength(0);
     });
   });
 
   describe("listCommands", () => {
-    it("returns commands ordered by timestamp desc", async () => {
-      await insertCommand(
+    it("returns commands ordered by timestamp desc", () => {
+      insertCommand(
         {
           tool_use_id: "tool_1",
           command: "first",
@@ -158,7 +158,7 @@ describe("db", () => {
         },
         db
       );
-      await insertCommand(
+      insertCommand(
         {
           tool_use_id: "tool_2",
           command: "second",
@@ -173,14 +173,14 @@ describe("db", () => {
         db
       );
 
-      const results = await listCommands(10, db);
+      const results = listCommands(10, db);
       expect(results[0].command).toBe("second");
       expect(results[1].command).toBe("first");
     });
 
-    it("respects limit", async () => {
+    it("respects limit", () => {
       for (let i = 0; i < 10; i++) {
-        await insertCommand(
+        insertCommand(
           {
             tool_use_id: `tool_${i}`,
             command: `cmd_${i}`,
@@ -196,39 +196,39 @@ describe("db", () => {
         );
       }
 
-      const results = await listCommands(5, db);
+      const results = listCommands(5, db);
       expect(results).toHaveLength(5);
     });
   });
 
   describe("indexedFiles", () => {
-    it("tracks indexed file state", async () => {
-      await updateIndexedFile("/path/to/file.jsonl", 1000, 123456789, db);
+    it("tracks indexed file state", () => {
+      updateIndexedFile("/path/to/file.jsonl", 1000, 123456789, db);
 
-      const indexed = await getIndexedFile("/path/to/file.jsonl", db);
+      const indexed = getIndexedFile("/path/to/file.jsonl", db);
       expect(indexed).not.toBeNull();
       expect(indexed!.last_byte_offset).toBe(1000);
       expect(indexed!.last_modified).toBe(123456789);
     });
 
-    it("updates existing file state", async () => {
-      await updateIndexedFile("/path/to/file.jsonl", 1000, 100, db);
-      await updateIndexedFile("/path/to/file.jsonl", 2000, 200, db);
+    it("updates existing file state", () => {
+      updateIndexedFile("/path/to/file.jsonl", 1000, 100, db);
+      updateIndexedFile("/path/to/file.jsonl", 2000, 200, db);
 
-      const indexed = await getIndexedFile("/path/to/file.jsonl", db);
+      const indexed = getIndexedFile("/path/to/file.jsonl", db);
       expect(indexed!.last_byte_offset).toBe(2000);
       expect(indexed!.last_modified).toBe(200);
     });
 
-    it("returns null for unknown file", async () => {
-      const indexed = await getIndexedFile("/nonexistent", db);
+    it("returns null for unknown file", () => {
+      const indexed = getIndexedFile("/nonexistent", db);
       expect(indexed).toBeNull();
     });
   });
 
   describe("getStats", () => {
-    it("returns correct counts", async () => {
-      await insertCommand(
+    it("returns correct counts", () => {
+      insertCommand(
         {
           tool_use_id: "t1",
           command: "cmd1",
@@ -242,7 +242,7 @@ describe("db", () => {
         },
         db
       );
-      await insertCommand(
+      insertCommand(
         {
           tool_use_id: "t2",
           command: "cmd2",
@@ -256,9 +256,9 @@ describe("db", () => {
         },
         db
       );
-      await updateIndexedFile("/file1.jsonl", 100, 100, db);
+      updateIndexedFile("/file1.jsonl", 100, 100, db);
 
-      const stats = await getStats(db);
+      const stats = getStats(db);
       expect(stats.totalCommands).toBe(2);
       expect(stats.indexedFiles).toBe(1);
     });

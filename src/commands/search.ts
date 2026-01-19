@@ -10,19 +10,19 @@ export interface SearchOptions {
   sort?: string; // "frecency" (default) or "time"
 }
 
-export async function search(pattern: string, options: SearchOptions = {}): Promise<void> {
+export function search(pattern: string, options: SearchOptions = {}): void {
   // Auto-sync before searching (unless disabled)
   if (!options.noSync) {
-    await sync();
+    sync();
   }
 
   const useFrecency = options.sort !== "time";
 
   let results: (Command | CommandWithFrecency)[];
   if (useFrecency) {
-    results = await searchCommandsWithFrecency(pattern, options.regex ?? false, options.cwd);
+    results = searchCommandsWithFrecency(pattern, options.regex ?? false, options.cwd);
   } else {
-    results = await searchCommands(pattern, options.regex ?? false, options.cwd);
+    results = searchCommands(pattern, options.regex ?? false, options.cwd);
   }
 
   const limited = options.limit ? results.slice(0, options.limit) : results;

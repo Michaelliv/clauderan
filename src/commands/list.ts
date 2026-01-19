@@ -9,10 +9,10 @@ export interface ListOptions {
   cwd?: string;
 }
 
-export async function list(options: ListOptions = {}): Promise<void> {
+export function list(options: ListOptions = {}): void {
   // Auto-sync before listing (unless disabled)
   if (!options.noSync) {
-    await sync();
+    sync();
   }
 
   const limit = options.limit ?? 20;
@@ -20,9 +20,9 @@ export async function list(options: ListOptions = {}): Promise<void> {
 
   let results: (Command | CommandWithFrecency)[];
   if (useFrecency) {
-    results = await listCommandsWithFrecency(limit, options.cwd);
+    results = listCommandsWithFrecency(limit, options.cwd);
   } else {
-    results = await listCommands(limit, options.cwd);
+    results = listCommands(limit, options.cwd);
   }
 
   if (results.length === 0) {

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { Database } from "bun:sqlite";
 import { search } from "./search";
 import { list } from "./list";
 import { syncCommand } from "./syncCmd";
 import { createDb, insertCommand, setDb } from "../db";
-import type { Database } from "sql.js";
 
 describe("command modules", () => {
   let db: Database;
@@ -12,8 +12,8 @@ describe("command modules", () => {
   let originalLog: typeof console.log;
   let originalError: typeof console.error;
 
-  beforeEach(async () => {
-    db = await createDb(":memory:");
+  beforeEach(() => {
+    db = createDb(":memory:");
     setDb(db);
 
     // Capture console output
@@ -25,7 +25,7 @@ describe("command modules", () => {
     console.error = (...args: unknown[]) => consoleErrorLogs.push(args.join(" "));
 
     // Seed test data
-    await insertCommand({
+    insertCommand({
       tool_use_id: "t1",
       command: "docker build -t app .",
       description: "Build docker image",
@@ -37,7 +37,7 @@ describe("command modules", () => {
       session_id: "s1",
     }, db);
 
-    await insertCommand({
+    insertCommand({
       tool_use_id: "t2",
       command: "npm test",
       description: "Run tests",
@@ -49,7 +49,7 @@ describe("command modules", () => {
       session_id: "s1",
     }, db);
 
-    await insertCommand({
+    insertCommand({
       tool_use_id: "t3",
       command: "docker push app",
       description: "Push image",
@@ -68,17 +68,17 @@ describe("command modules", () => {
   });
 
   describe("search", () => {
-    it("finds commands by substring (time sort)", async () => {
+    it("finds commands by substring (time sort)", () => {
       // Use time sort to avoid highlighting ANSI codes in output
-      await search("docker", { noSync: true, sort: "time" });
+      search("docker", { noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Found 2 command(s)"))).toBe(true);
       expect(consoleLogs.some(l => l.includes("docker build"))).toBe(true);
       expect(consoleLogs.some(l => l.includes("docker push"))).toBe(true);
     });
 
-    it("finds commands with frecency sort (default)", async () => {
-      await search("docker", { noSync: true });
+    it("finds commands with frecency sort (default)", () => {
+      search("docker", { noSync: true });
 
       expect(consoleLogs.some(l => l.includes("Found 2 command(s)"))).toBe(true);
       expect(consoleLogs.some(l => l.includes("[sorted by frecency]"))).toBe(true);
@@ -86,35 +86,35 @@ describe("command modules", () => {
       expect(consoleLogs.some(l => l.includes("docker"))).toBe(true);
     });
 
-    it("filters by regex", async () => {
-      await search("docker (build|push)", { regex: true, noSync: true, sort: "time" });
+    it("filters by regex", () => {
+      search("docker (build|push)", { regex: true, noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Found 2 command(s)"))).toBe(true);
     });
 
-    it("filters by cwd", async () => {
-      await search("docker", { cwd: "/projects/app", noSync: true, sort: "time" });
+    it("filters by cwd", () => {
+      search("docker", { cwd: "/projects/app", noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Found 1 command(s)"))).toBe(true);
       expect(consoleLogs.some(l => l.includes("docker build"))).toBe(true);
     });
 
-    it("respects limit", async () => {
-      await search("docker", { limit: 1, noSync: true, sort: "time" });
+    it("respects limit", () => {
+      search("docker", { limit: 1, noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("(showing 1)"))).toBe(true);
     });
 
-    it("shows message when no matches", async () => {
-      await search("nonexistent", { noSync: true });
+    it("shows message when no matches", () => {
+      search("nonexistent", { noSync: true });
 
       expect(consoleLogs.some(l => l.includes("No commands found matching:"))).toBe(true);
     });
   });
 
   describe("list", () => {
-    it("lists recent commands (time sort)", async () => {
-      await list({ noSync: true, sort: "time" });
+    it("lists recent commands (time sort)", () => {
+      list({ noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Last 3 command(s)"))).toBe(true);
       expect(consoleLogs.some(l => l.includes("docker push"))).toBe(true);
@@ -122,33 +122,33 @@ describe("command modules", () => {
       expect(consoleLogs.some(l => l.includes("docker build"))).toBe(true);
     });
 
-    it("lists commands with frecency sort (default)", async () => {
-      await list({ noSync: true });
+    it("lists commands with frecency sort (default)", () => {
+      list({ noSync: true });
 
       expect(consoleLogs.some(l => l.includes("[sorted by frecency]"))).toBe(true);
     });
 
-    it("respects limit", async () => {
-      await list({ limit: 2, noSync: true, sort: "time" });
+    it("respects limit", () => {
+      list({ limit: 2, noSync: true, sort: "time" });
 
       expect(consoleLogs.some(l => l.includes("Last 2 command(s)"))).toBe(true);
     });
 
-    it("shows message when no commands", async () => {
+    it("shows message when no commands", () => {
       // Clear db
-      const emptyDb = await createDb(":memory:");
+      const emptyDb = createDb(":memory:");
       setDb(emptyDb);
 
-      await list({ noSync: true });
+      list({ noSync: true });
 
       expect(consoleLogs.some(l => l.includes("No commands in history"))).toBe(true);
     });
   });
 
   describe("syncCommand", () => {
-    it("displays sync results", async () => {
+    it("displays sync results", () => {
       // This will try to sync from real claude dir, so just check output format
-      await syncCommand({ force: false });
+      syncCommand({ force: false });
 
       expect(consoleLogs.some(l => l.includes("Syncing new commands..."))).toBe(true);
       expect(consoleLogs.some(l => l.includes("Scanned"))).toBe(true);
@@ -156,8 +156,8 @@ describe("command modules", () => {
       expect(consoleLogs.some(l => l.includes("Total:"))).toBe(true);
     });
 
-    it("shows force message when force is true", async () => {
-      await syncCommand({ force: true });
+    it("shows force message when force is true", () => {
+      syncCommand({ force: true });
 
       expect(consoleLogs.some(l => l.includes("Force re-indexing"))).toBe(true);
     });

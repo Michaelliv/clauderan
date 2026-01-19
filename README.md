@@ -36,18 +36,18 @@ Every bash command Claude Code runs is logged in session files. `deja` indexes t
 
 ## Features
 
-- **Frecency-based sorting** - Commands are ranked by a combination of frequency and recency, so your most useful commands appear first
+- **Smart ranking** - Combines BM25 relevance with frecency (frequency + recency) so the most useful commands appear first
+- **Full-text search** - Uses SQLite FTS5 for fast, typo-tolerant searching
 - **Match highlighting** - Search patterns are highlighted in yellow in the output
 - **Automatic sync** - History is automatically synced before each search
 
 ## Install
 
-```bash
-# With Bun (recommended)
-bun add -g cc-dejavu
+Requires [Bun](https://bun.sh).
 
-# With npm
-npm install -g cc-dejavu
+```bash
+# Install globally
+bun add -g cc-dejavu
 
 # Or build from source
 git clone https://github.com/Michaelliv/cc-dejavu
@@ -146,16 +146,20 @@ Index new commands from Claude Code sessions.
 |------|-------------|
 | `--force`, `-f` | Re-index all sessions from scratch |
 
-## Frecency Algorithm
+## Ranking Algorithm
 
-Results are sorted by "frecency" - a combination of frequency and recency:
+Results are ranked by combining **BM25 relevance** with **frecency** (frequency + recency):
 
-- **Recency weights**: Commands run in the last 4 hours score highest, with decreasing weights for last day, week, month, and older
-- **Frequency**: Uses logarithmic scaling to prevent very frequent commands from dominating
+```
+score = frecency × (0.5 + normalized_bm25)
+```
 
-This means recently-used commands you run often appear at the top, while one-off commands from months ago sink to the bottom.
+- **BM25**: Search terms that are more prominent in a command score higher. "build" in `bun run build` ranks higher than "build" buried in a long command.
+- **Frecency**: Commands you run often and recently score higher. Uses logarithmic scaling for frequency and time-decay weights for recency.
 
-Use `--sort time` to revert to simple timestamp ordering.
+This means a command that closely matches your search AND you use frequently will appear at the top.
+
+Use `--sort time` to revert to simple timestamp ordering (ignores BM25 and frecency).
 
 ## How It Works
 
