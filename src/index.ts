@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { search } from "./commands/search";
 import { list } from "./commands/list";
@@ -6,12 +6,16 @@ import { syncCommand } from "./commands/syncCmd";
 import { onboard } from "./commands/onboard";
 import { parseArgs } from "./cli";
 
+const VERSION = "0.4.0";
+const REPO_URL = "https://github.com/Michaelliv/cc-dejavu";
+
 const args = process.argv.slice(2);
 const command = args[0];
 
 function printHelp(): void {
   console.log(`
-\x1b[1mdeja\x1b[0m - Claude Code bash history
+\x1b[1mdeja\x1b[0m v${VERSION} - Claude Code bash history
+${REPO_URL}
 
 \x1b[1mUSAGE:\x1b[0m
   deja <command> [options]
@@ -99,6 +103,12 @@ async function main(): Promise<void> {
     case "-h":
     case undefined:
       printHelp();
+      break;
+
+    case "--version":
+    case "-v":
+    case "-V":
+      console.log(VERSION);
       break;
 
     default:

@@ -60,52 +60,21 @@ function initSchema(db: Database): void {
   db.run(`CREATE INDEX IF NOT EXISTS idx_commands_command ON commands(command)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_commands_timestamp ON commands(timestamp)`);
 
-  // FTS5 virtual table for full-text search with BM25 ranking
-  db.run(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS commands_fts USING fts5(
-      command,
-      description,
-      content='commands',
-      content_rowid='id'
-    )
-  `);
+  // Clean up legacy FTS5 artifacts (migration from v0.3.x)
+  cleanupFts5(db);
+}
 
-  // Triggers to keep FTS index in sync
-  db.run(`
-    CREATE TRIGGER IF NOT EXISTS commands_ai AFTER INSERT ON commands BEGIN
-      INSERT INTO commands_fts(rowid, command, description)
-      VALUES (new.id, new.command, new.description);
-    END
-  `);
+function cleanupFts5(db: Database): void {
+  // Drop FTS5 triggers if they exist
+  db.run(`DROP TRIGGER IF EXISTS commands_ai`);
+  db.run(`DROP TRIGGER IF EXISTS commands_ad`);
+  db.run(`DROP TRIGGER IF EXISTS commands_au`);
 
-  db.run(`
-    CREATE TRIGGER IF NOT EXISTS commands_ad AFTER DELETE ON commands BEGIN
-      INSERT INTO commands_fts(commands_fts, rowid, command, description)
-      VALUES ('delete', old.id, old.command, old.description);
-    END
-  `);
-
-  db.run(`
-    CREATE TRIGGER IF NOT EXISTS commands_au AFTER UPDATE ON commands BEGIN
-      INSERT INTO commands_fts(commands_fts, rowid, command, description)
-      VALUES ('delete', old.id, old.command, old.description);
-      INSERT INTO commands_fts(rowid, command, description)
-      VALUES (new.id, new.command, new.description);
-    END
-  `);
-
-  // Rebuild FTS index if commands exist but FTS is empty (migration for existing DBs)
-  const cmdCount = db.query(`SELECT COUNT(*) as count FROM commands`).get() as { count: number };
-
-  if (cmdCount.count > 0) {
-    const ftsCount = db.query(`SELECT COUNT(*) as count FROM commands_fts`).get() as { count: number };
-
-    if (ftsCount.count === 0) {
-      db.run(`
-        INSERT INTO commands_fts(rowid, command, description)
-        SELECT id, command, description FROM commands
-      `);
-    }
+  // Drop FTS5 virtual table if it exists
+  try {
+    db.run(`DROP TABLE IF EXISTS commands_fts`);
+  } catch {
+    // Ignore errors - table might not exist or FTS5 module not available
   }
 }
 
@@ -201,13 +170,12 @@ export function searchCommandsWithFrecency(
 ): CommandWithFrecency[] {
   const database = db ?? getDb();
 
-  // For regex mode, fall back to scanning all commands
   if (useRegex) {
     return searchCommandsWithFrecencyRegex(database, pattern, cwd);
   }
 
-  // Use FTS5 with BM25 for non-regex search
-  return searchCommandsWithFrecencyFts(database, pattern, cwd);
+  // Use LIKE for substring search, sorted by frecency
+  return searchCommandsWithFrecencyLike(database, pattern, cwd);
 }
 
 function searchCommandsWithFrecencyRegex(database: Database, pattern: string, cwd?: string): CommandWithFrecency[] {
@@ -270,54 +238,7 @@ function searchCommandsWithFrecencyRegex(database: Database, pattern: string, cw
   return results;
 }
 
-function searchCommandsWithFrecencyFts(database: Database, pattern: string, cwd?: string): CommandWithFrecency[] {
-  // Escape FTS5 special characters and convert to prefix search for each term
-  const ftsPattern = pattern
-    .replace(/['"]/g, "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((term) => `"${term}"*`)
-    .join(" ");
-
-  if (!ftsPattern) {
-    return [];
-  }
-
-  // Step 1: Get matching rows with BM25 scores (no grouping yet)
-  const matchSql = `
-    SELECT
-      c.id,
-      c.command,
-      -bm25(commands_fts) as bm25_score
-    FROM commands_fts
-    JOIN commands c ON commands_fts.rowid = c.id
-    WHERE commands_fts MATCH ?
-    ${cwd ? "AND c.cwd = ?" : ""}
-  `;
-
-  const matches = (cwd ? database.query(matchSql).all(ftsPattern, cwd) : database.query(matchSql).all(ftsPattern)) as Array<{
-    id: number;
-    command: string;
-    bm25_score: number;
-  }>;
-
-  if (matches.length === 0) {
-    return [];
-  }
-
-  // Step 2: Group by command and get best BM25 score per command
-  const commandBm25Map = new Map<string, number>();
-  for (const match of matches) {
-    const existing = commandBm25Map.get(match.command);
-    if (existing === undefined || match.bm25_score > existing) {
-      commandBm25Map.set(match.command, match.bm25_score);
-    }
-  }
-
-  // Step 3: Get full command info with frecency
-  const uniqueCommands = [...commandBm25Map.keys()];
-  const placeholders = uniqueCommands.map(() => "?").join(",");
-
+function searchCommandsWithFrecencyLike(database: Database, pattern: string, cwd?: string): CommandWithFrecency[] {
   const sql = `
     SELECT
       command,
@@ -332,11 +253,13 @@ function searchCommandsWithFrecencyFts(database: Database, pattern: string, cwd?
       (SELECT is_error FROM commands c2 WHERE c2.command = c1.command ORDER BY timestamp DESC LIMIT 1) as is_error,
       (SELECT session_id FROM commands c2 WHERE c2.command = c1.command ORDER BY timestamp DESC LIMIT 1) as session_id
     FROM commands c1
-    WHERE command IN (${placeholders})
+    WHERE command LIKE ?
+    ${cwd ? "AND cwd = ?" : ""}
     GROUP BY command
   `;
 
-  const rawResults = database.query(sql).all(...uniqueCommands) as Array<{
+  const likePattern = `%${pattern}%`;
+  const rows = (cwd ? database.query(sql).all(likePattern, cwd) : database.query(sql).all(likePattern)) as Array<{
     command: string;
     frequency: number;
     most_recent: string | null;
@@ -350,24 +273,9 @@ function searchCommandsWithFrecencyFts(database: Database, pattern: string, cwd?
     session_id: string | null;
   }>;
 
-  // Normalize BM25 scores to 0-1 range
-  const bm25Scores = [...commandBm25Map.values()];
-  const maxBm25 = Math.max(...bm25Scores);
-  const minBm25 = Math.min(...bm25Scores);
-  const bm25Range = maxBm25 - minBm25 || 1;
-
-  const results: CommandWithFrecency[] = [];
-
-  for (const row of rawResults) {
+  const results: CommandWithFrecency[] = rows.map((row) => {
     const frecencyScore = calculateFrecencyScore(row.frequency, row.most_recent);
-    const bm25Score = commandBm25Map.get(row.command) ?? minBm25;
-    const normalizedBm25 = (bm25Score - minBm25) / bm25Range;
-
-    // Combined score: frecency weighted by BM25 relevance
-    // BM25 acts as a multiplier (0.5 to 1.5) on frecency
-    const combinedScore = frecencyScore * (0.5 + normalizedBm25);
-
-    results.push({
+    return {
       id: row.id,
       tool_use_id: row.tool_use_id,
       command: row.command,
@@ -379,9 +287,9 @@ function searchCommandsWithFrecencyFts(database: Database, pattern: string, cwd?
       timestamp: row.most_recent,
       session_id: row.session_id,
       frequency: row.frequency,
-      frecency_score: combinedScore,
-    });
-  }
+      frecency_score: frecencyScore,
+    };
+  });
 
   results.sort((a, b) => b.frecency_score - a.frecency_score);
   return results;
@@ -476,15 +384,3 @@ export function getStats(db?: Database): { totalCommands: number; indexedFiles: 
   };
 }
 
-export function rebuildFtsIndex(db?: Database): void {
-  const database = db ?? getDb();
-
-  // Clear existing FTS data
-  database.run(`DELETE FROM commands_fts`);
-
-  // Rebuild from commands table
-  database.run(`
-    INSERT INTO commands_fts(rowid, command, description)
-    SELECT id, command, description FROM commands
-  `);
-}
